@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Éditeur de compétences professionnelles SEGPA — version curseurs</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--bg:#f6f8fa;--card:#fff;--accent:#0ea5a4;--muted:#374151}
+body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);margin:0;padding:18px;color:#0f172a}
+.container{max-width:1200px;margin:0 auto}
+h1{margin:0 0 12px;font-size:20px;color:#0f172a;text-align:center}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.05)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.canvas-wrap{width:100%;max-width:540px;display:flex;flex-direction:column;align-items:center;background:#fff;padding:12px;border-radius:8px}
+.legend{font-weight:700;margin-bottom:8px}
+.note{font-weight:700;margin-top:8px}
+.small{font-size:13px;color:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #e6e9ef;padding:8px;text-align:left}
+th{background:#f3f4f6}
+.btn{background:var(--accent);color:white;padding:9px 12px;border-radius:8px;border:0;cursor:pointer}
+.btn.secondary{background:#374151}
+.flex-row{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.student-nav{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.nav-btn{background:none;border:none;font-size:24px;font-weight:700;cursor:pointer;color:var(--accent);padding:0}
+/* Sliders panel */
+.sliders{width:100%;margin-top:10px}
+.sliders h4{margin:10px 0 6px 0}
+.slider-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin:6px 0}
+.slider-row label{font-size:13px;color:#111827}
+.slider-row input[type="range"]{width:100%}
+.value-badge{min-width:36px;text-align:center;font-weight:700;background:#eef2f7;border:1px solid #e6e9ef;border-radius:8px;padding:4px 8px}
+@media(max-width:900px){.controls{grid-template-columns:1fr}.flex-row{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Éditeur de compétences professionnelles SEGPA</h1>
+
+  <div class="controls card">
+    <div>
+      <label>Importer une liste d'élèves en CSV (1 nom par ligne)</label><br>
+      <input type="file" id="csvInput" accept=".csv" /><br>
+      <div class="small">Prend la première colonne si CSV.</div>
+    </div>
+    <div>
+      <label>Ajouter un élève manuellement</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input type="text" id="manualStudent" placeholder="Nom de l'élève" style="flex:1"/>
+        <button class="btn" id="addBtn">Ajouter</button>
+      </div>
+      <label style="display:block;margin-top:8px">Choisir un élève</label>
+      <select id="studentSelect"><option value="">-- Sélectionner --</option></select>
+      <label style="display:block;margin-top:8px">Date d'évaluation</label>
+      <input type="date" id="evalDate" />
+    </div>
+  </div>
+
+  <div class="card flex-row">
+    <div class="canvas-wrap">
+      <div class="legend">Ajuster les curseurs pour noter</div>
+      <div id="studentNav" class="student-nav">
+        <button id="prevBtn" class="nav-btn">&lt;</button>
+        <div id="studentName" style="font-weight:800;font-size:18px"></div>
+        <button id="nextBtn" class="nav-btn">&gt;</button>
+      </div>
+      <canvas id="radarChart" width="520" height="520" style="background:#fff;border-radius:6px"></canvas>
+      <div id="noteSur20" class="note"></div>
+
+      <!-- Sliders panel -->
+      <div class="sliders card" id="slidersPanel">
+        <h4>Compétences</h4>
+        <div id="sliders"></div>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <div style="font-weight:800;margin-bottom:6px">Moyenne de la classe</div>
+      <canvas id="classChart" width="520" height="520" style="background:#fff;border-radius:6px"></canvas>
+      <div style="margin-top:12px">
+        <button class="btn" id="exportBtn">Exporter en PDF (élève)</button>
+        <button class="btn secondary" id="exportAllBtn">Exporter PDF (toute la classe)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>Tableau des notes</h3>
+    <div id="notesTable"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const competencies = [
+    "Autonomie","Organisation","Habileté manuelle","Vision dans l'espace","Sécurité",
+    "Compréhension des consignes","Logique et raisonnement","Capacité à anticiper",
+    "Mémoire des procédures","Capacité critique / créativité","Motivation et engagement",
+    "Gestion du stress et adaptabilité","Travail en équipe","Respect des délais","Attitude face aux critiques"
+  ];
+
+  const pointColors = competencies.map((_,i)=>`hsl(${(i*24)%360} 75% 45%)`);
+  const studentFill = 'rgba(54,162,235,0.28)';
+  const classFill = 'rgba(255,99,132,0.22)';
+
+  const studentData = {};
+  const csvInput = document.getElementById('csvInput');
+  const addBtn = document.getElementById('addBtn');
+  const manualInput = document.getElementById('manualStudent');
+  const studentSelect = document.getElementById('studentSelect');
+  const studentNameEl = document.getElementById('studentName');
+  const noteEl = document.getElementById('noteSur20');
+  const notesTable = document.getElementById('notesTable');
+  const exportBtn = document.getElementById('exportBtn');
+  const exportAllBtn = document.getElementById('exportAllBtn');
+  const evalDateInput = document.getElementById('evalDate');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const radarCanvas = document.getElementById('radarChart');
+  const slidersContainer = document.getElementById('sliders');
+
+  Chart.defaults.animation = false;
+  const radarCtx = radarCanvas.getContext('2d');
+  const classCtx = document.getElementById('classChart').getContext('2d');
+
+  function createEmptyRadar(ctx){
+    return new Chart(ctx, {
+      type: 'radar',
+      data: { labels: competencies, datasets: [] },
+      options: {
+        responsive: false,
+        maintainAspectRatio: false,
+        elements: { line: { tension: 0 } },
+        scales: {
+          r: { 
+            min: 0, 
+            max: 5, 
+            ticks: { 
+              stepSize: 1,
+              backdropColor: 'transparent',
+              display: true,
+              callback: function(value, index, values) {
+                  return value;
+              }
+            }, 
+            grid: { 
+              circular: true 
+            },
+            pointLabels: {
+              font: {
+                size: 10
+              }
+            },
+            startAngle: -90
+          }
+        },
+        plugins: { 
+          legend: { display: false },
+          tooltip: { enabled: false }
+        }
+      }
+    });
+  }
+
+  const radarChart = createEmptyRadar(radarCtx);
+  const classChart = createEmptyRadar(classCtx);
+
+  function createOption(name){ const o=document.createElement('option'); o.value=name; o.textContent=name; return o; }
+
+  function parseNameFromLine(line){
+    line = line.replace(/(^"+|"+$)/g,'').trim();
+    if(!line) return '';
+    const parts = line.split(/[,;\t]/).map(p=>p.trim()).filter(Boolean);
+    return parts.length ? parts[0] : line;
+  }
+
+  function addStudentIfNew(name){
+    if(!name) return false;
+    if(!studentData[name]){
+      studentData[name] = { scores: Array(competencies.length).fill(0) };
+      studentSelect.appendChild(createOption(name));
+      return true;
+    }
+    return false;
+  }
+
+  csvInput.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      const raw = ev.target.result.replace(/\uFEFF/g,'');
+      const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      let firstAdded=null;
+      lines.forEach(line=>{
+        const name = parseNameFromLine(line);
+        if(!name) return;
+        const added = addStudentIfNew(name);
+        if(added && !firstAdded) firstAdded = name;
+      });
+      if(firstAdded){
+        studentSelect.value = firstAdded;
+        onStudentChange();
+      }
+      updateClassAverage();
+      renderNotesTable();
+    };
+    reader.readAsText(file,'UTF-8');
+  });
+
+  function handleAddStudent(){
+    const name = manualInput.value.trim();
+    if(!name){ alert('Saisis un nom'); return; }
+    addStudentIfNew(name);
+    manualInput.value='';
+    studentSelect.value = name;
+    onStudentChange();
+    updateClassAverage();
+    renderNotesTable();
+  }
+  
+  addBtn.addEventListener('click', handleAddStudent);
+  manualInput.addEventListener('keyup', (e)=>{
+    if(e.key === 'Enter'){
+      handleAddStudent();
+    }
+  });
+
+  studentSelect.addEventListener('change', onStudentChange);
+
+  function onStudentChange(){
+    const name = studentSelect.value;
+    if(!name){
+      studentNameEl.textContent='';
+      radarChart.data.datasets = [];
+      radarChart.update();
+      noteEl.textContent='';
+      slidersContainer.innerHTML='';
+      return;
+    }
+    studentNameEl.textContent = name;
+    buildOrUpdateSliders(name);
+    updateStudentChart(name);
+    updateClassAverage();
+    renderNotesTable();
+  }
+
+  function getStudentScore(name){
+    const arr = studentData[name]?.scores || Array(competencies.length).fill(0);
+    const sum = arr.reduce((a,b)=>a+b,0);
+    const avgOutOf5 = sum > 0 ? sum / competencies.length : 0;
+    const outOf20 = Math.round((avgOutOf5/5)*20*10)/10;
+    return { avgOutOf5, outOf20 };
+  }
+
+  function updateStudentChart(name){
+    const values = studentData[name]?.scores || Array(competencies.length).fill(0);
+    const pb = values.map((v,i)=> v>0 ? pointColors[i] : '#bbb');
+    radarChart.data.datasets = [{
+      label: name,
+      data: values,
+      backgroundColor: studentFill,
+      borderColor: 'rgba(54,162,235,1)',
+      pointBackgroundColor: pb,
+      pointBorderColor: '#fff',
+      pointRadius: 7,
+      borderWidth: 2
+    }];
+    radarChart.update();
+    const score = getStudentScore(name).outOf20;
+    noteEl.textContent = score === 0 ? 'Non noté' : 'Note : ' + score + '/20';
+  }
+
+  function updateClassAverage(){
+    const names = Object.keys(studentData);
+    const scoredStudents = names.filter(n => studentData[n].scores.some(score => score > 0));
+    let avg = Array(competencies.length).fill(0);
+    
+    if(scoredStudents.length > 0){
+      const sums = Array(competencies.length).fill(0);
+      scoredStudents.forEach(n => studentData[n].scores.forEach((v,i)=> sums[i]+=v));
+      avg = sums.map(s => Math.round((s/scoredStudents.length)*100)/100);
+    }
+    
+    const pb = avg.map((v,i)=> v>0 ? pointColors[i] : '#bbb');
+    classChart.data.datasets = [{
+      label: 'Moyenne classe',
+      data: avg,
+      backgroundColor: classFill,
+      borderColor: 'rgba(255,99,132,1)',
+      pointBackgroundColor: pb,
+      pointBorderColor: '#fff',
+      pointRadius: 6,
+      borderWidth: 2
+    }];
+    classChart.update();
+  }
+
+  function renderNotesTable(){
+    const names = Object.keys(studentData);
+    let html = '<table><thead><tr><th>Élève</th><th>Note /20</th></tr></thead><tbody>';
+    names.forEach(n=>{
+      const s = getStudentScore(n);
+      const scoreText = s.outOf20 === 0 ? 'Non noté' : s.outOf20;
+      html += `<tr><td>${n}</td><td>${scoreText}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    notesTable.innerHTML = html;
+  }
+
+  /* ------------------------------
+     SYSTÈME DE CURSEURS
+     ------------------------------ */
+  function buildOrUpdateSliders(name){
+    // Construire une fois si vide
+    if(!slidersContainer.dataset.built){
+      slidersContainer.innerHTML = '';
+      competencies.forEach((label, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'slider-row';
+
+        const left = document.createElement('div');
+        const lab = document.createElement('label');
+        lab.textContent = label;
+        left.appendChild(lab);
+
+        const right = document.createElement('div');
+        right.style.display='flex';
+        right.style.alignItems='center';
+        right.style.gap='8px';
+
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = '0';
+        input.max = '5';
+        input.step = '1';
+        input.dataset.index = String(idx);
+        input.ariaLabel = label;
+
+        const badge = document.createElement('span');
+        badge.className = 'value-badge';
+        badge.textContent = '0';
+
+        right.appendChild(input);
+        right.appendChild(badge);
+
+        row.appendChild(left);
+        row.appendChild(right);
+        slidersContainer.appendChild(row);
+      });
+      slidersContainer.dataset.built = '1';
+
+      // Écouteurs (délégués) pour tous les sliders
+      slidersContainer.addEventListener('input', (e)=>{
+        const t = e.target;
+        if(!(t instanceof HTMLInputElement) || t.type !== 'range') return;
+        const idx = Number(t.dataset.index);
+        const value = Number(t.value);
+        const badge = t.parentElement?.querySelector('.value-badge');
+        if(badge) badge.textContent = String(value);
+
+        const current = studentSelect.value;
+        if(!current) return;
+        // Mise à jour des données élève
+        if(studentData[current]){
+          studentData[current].scores[idx] = value;
+          updateStudentChart(current);
+          updateClassAverage();
+          renderNotesTable();
+        }
+      });
+    }
+
+    // Mettre à jour les valeurs d'affichage selon l'élève
+    const scores = studentData[name]?.scores || Array(competencies.length).fill(0);
+    const ranges = slidersContainer.querySelectorAll('input[type="range"]');
+    ranges.forEach((r, i)=>{
+      r.value = String(scores[i] || 0);
+      const badge = r.parentElement?.querySelector('.value-badge');
+      if(badge) badge.textContent = String(scores[i] || 0);
+    });
+  }
+
+  // Navigation buttons
+  function navigateStudent(direction){
+    const names = Object.keys(studentData);
+    if(names.length === 0) return;
+    let currentIndex = names.indexOf(studentSelect.value);
+    
+    if(currentIndex === -1){
+      studentSelect.value = names[0];
+    } else {
+      currentIndex += direction;
+      if(currentIndex < 0) currentIndex = names.length - 1;
+      if(currentIndex >= names.length) currentIndex = 0;
+      studentSelect.value = names[currentIndex];
+    }
+    onStudentChange();
+  }
+
+  prevBtn.addEventListener('click', ()=> navigateStudent(-1));
+  nextBtn.addEventListener('click', ()=> navigateStudent(1));
+
+  // Helper for date formatting
+  function formatDate(isoDate){
+    if(!isoDate) return '';
+    const [year, month, day] = isoDate.split('-');
+    return `Date : ${day}/${month}/${year}`;
+  }
+
+  async function buildStackedCanvas(name){
+    updateStudentChart(name);
+    updateClassAverage();
+    await new Promise(r=>setTimeout(r,120));
+    const sCanvas = radarChart.canvas;
+    const cCanvas = classChart.canvas;
+    const cw = sCanvas.width, ch = sCanvas.height;
+    const gap = Math.round(cw*0.06);
+    const outW = cw + 80;
+    const outH = 100 + ch + gap + 40 + ch + 40;
+    const out = document.createElement('canvas'); out.width = outW; out.height = outH;
+    const ctx = out.getContext('2d');
+    const chartX = (outW - cw) / 2;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,outW,outH);
+    ctx.fillStyle = '#000'; 
+    ctx.font = '20px Arial bold';
+    ctx.textAlign = 'center';
+    ctx.fillText('Évaluation des compétences professionnelles SEGPA', outW / 2, 30, outW - 40);
+    ctx.font = '22px Arial bold';
+    ctx.textAlign = 'center';
+    ctx.fillText(name, outW / 2, 60);
+    const score = getStudentScore(name).outOf20;
+    ctx.font = '18px Arial';
+    ctx.fillText(score === 0 ? 'Non noté' : `Note : ${score}/20`, outW / 2, 85);
+    ctx.drawImage(sCanvas, chartX, 90, cw, ch);
+    ctx.fillStyle = '#000'; ctx.font = '18px Arial bold';
+    ctx.textAlign = 'center';
+    ctx.fillText('Moyenne de la classe', outW / 2, 90 + ch + gap + 20);
+    ctx.drawImage(cCanvas, chartX, 90 + ch + gap + 40, cw, ch);
+    const dateStr = formatDate(evalDateInput.value);
+    if(dateStr){
+      ctx.fillStyle = '#000';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(dateStr, 20, outH - 20);
+    }
+    return out;
+  }
+
+  async function exportSinglePDF(){
+    const { jsPDF } = window.jspdf;
+    const name = studentSelect.value;
+    if(!name){ alert('Sélectionne un élève'); return; }
+    const canvas = await buildStackedCanvas(name);
+    const img = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    let imgW = pageW - 20;
+    let imgH = (canvas.height * imgW)/canvas.width;
+    if(imgH > pageH - 20){ imgW = (pageH - 20) * canvas.width / canvas.height; imgH = pageH - 20; }
+    const imgX = (pageW - imgW) / 2;
+    pdf.addImage(img, 'PNG', imgX, 10, imgW, imgH);
+    const dateStr = new Date().toISOString().slice(0,10);
+    pdf.save(`${name}_competences_${dateStr}.pdf`);
+  }
+
+  async function exportClassPDF(){
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const names = Object.keys(studentData);
+    if(names.length===0){ alert('Aucun élève'); return; }
+    const dateStr = new Date().toISOString().slice(0,10);
+    for(let i=0;i<names.length;i++){
+      const name = names[i];
+      const canvas = await buildStackedCanvas(name);
+      const img = canvas.toDataURL('image/png');
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      let imgW = pageW - 20;
+      let imgH = (canvas.height * imgW)/canvas.width;
+      if(imgH > pageH - 20){ imgW = (pageH - 20) * canvas.width / canvas.height; imgH = pageH - 20; }
+      const imgX = (pageW - imgW) / 2;
+      if(i>0) pdf.addPage();
+      pdf.addImage(img, 'PNG', imgX, 10, imgW, imgH);
+    }
+    const tableCanvas = document.createElement('canvas');
+    const namesList = Object.keys(studentData);
+    const rowH = 28; const headerH = 50;
+    const col1W = 300; const col2W = 80;
+    const w = Math.max(400, col1W + col2W + 60);
+    const h = headerH + rowH * namesList.length + 40;
+    tableCanvas.width = Math.max(400, w); tableCanvas.height = Math.max(400, h);
+    const tctx = tableCanvas.getContext('2d');
+    tctx.fillStyle='#fff'; tctx.fillRect(0,0,tableCanvas.width,tableCanvas.height);
+    tctx.fillStyle='#000'; tctx.font='18px Arial'; tctx.fillText('Tableau des notes - Classe', 20, 30);
+    tctx.fillStyle='#eee'; tctx.fillRect(20,40,tableCanvas.width-40,30);
+    tctx.fillStyle='#000'; tctx.font='14px Arial';
+    tctx.fillText('Élève', 30, 62); tctx.fillText('Note /20', tableCanvas.width - 110, 62);
+    let y = 92; tctx.font='13px Arial';
+    namesList.forEach(n=>{ const s = getStudentScore(n); tctx.fillText(n,30,y); tctx.fillText(String(s.outOf20 === 0 ? 'Non noté' : s.outOf20), tableCanvas.width - 110, y); y+=rowH; });
+    const formattedDate = (function(iso){ if(!iso) return ''; const [year,month,day]=iso.split('-'); return `Date : ${day}/${month}/${year}`; })(document.getElementById('evalDate').value);
+    if(formattedDate){
+      tctx.fillStyle = '#000';
+      tctx.font = '12px Arial';
+      tctx.textAlign = 'left';
+      tctx.fillText(formattedDate, 20, h - 20);
+    }
+    const tableImg = tableCanvas.toDataURL('image/png');
+    pdf.addPage();
+    const pImgProps = pdf.getImageProperties(tableImg);
+    const pImgW = pdf.internal.pageSize.getWidth() - 20;
+    const pImgH = (pImgProps.height * pImgW) / pImgProps.width;
+    pdf.addImage(tableImg, 'PNG', 10, 10, pImgW, pImgH);
+    pdf.save(`Classe_Competences_${dateStr}.pdf`);
+  }
+
+  exportBtn.addEventListener('click', exportSinglePDF);
+  exportAllBtn.addEventListener('click', exportClassPDF);
+  
+  updateClassAverage();
+  renderNotesTable();
+
+  // REMARQUE : le clic sur le radar a été remplacé par les curseurs.
+})();
+</script>
+</body>
+</html>
