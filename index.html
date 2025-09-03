@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Découvre tes Talents Professionnels</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #005a9e; /* Bleu institutionnel */
+            --secondary-color: #e30613; /* Rouge pour l'action */
+            --light-gray: #f4f4f4;
+            --dark-gray: #333;
+            --font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--light-gray);
+            color: var(--dark-gray);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        
+        h2 {
+            margin-top: 40px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .skill-group {
+            margin-bottom: 25px;
+        }
+
+        .skill-item {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .skill-name {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .skill-description {
+            font-style: italic;
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .skill-value {
+            font-weight: bold;
+            color: var(--primary-color);
+            background-color: #e9f2fa;
+            padding: 3px 8px;
+            border-radius: 5px;
+            min-width: 25px;
+            text-align: center;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            border-radius: 5px;
+        }
+
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--primary-color);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--primary-color);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        #calculate-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            background-color: var(--secondary-color);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: background-color 0.3s;
+        }
+
+        #calculate-btn:hover {
+            background-color: #c00511;
+        }
+
+        #results {
+            display: none;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+
+        #chart-container {
+            width: 100%;
+            max-width: 400px;
+            margin: auto;
+        }
+        
+        #advice-container {
+            padding: 20px;
+            background-color: #e9f2fa;
+            border-left: 5px solid var(--primary-color);
+            border-radius: 5px;
+        }
+        
+        #advice-container h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        #global-score {
+            text-align: center;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        
+        #global-score span {
+            font-weight: bold;
+            font-size: 2em;
+            color: var(--secondary-color);
+        }
+
+        @media (max-width: 600px) {
+            #container {
+                padding: 15px;
+            }
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <h1>Découvre tes Talents Professionnels</h1>
+        <p>Ce questionnaire va t'aider à mieux comprendre tes points forts et les points sur lesquels tu peux progresser. Fais glisser le curseur pour chaque compétence, sans trop réfléchir, en étant le plus honnête possible. Il n'y a pas de bonne ou de mauvaise réponse !</p>
+
+        <div class="skill-group">
+            <h2>🚀 Action & Initiative</h2>
+            <div class="skill-item">
+                <label for="audace" class="skill-label">
+                    <div>
+                        <span class="skill-name">Audace</span>
+                        <div class="skill-description">Oser faire les choses, proposer des idées.</div>
+                    </div>
+                    <span id="audace-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="audace" min="0" max="10" value="5" data-category="action">
+            </div>
+            <div class="skill-item">
+                <label for="debrouillardise" class="skill-label">
+                    <div>
+                        <span class="skill-name">Débrouillardise</span>
+                        <div class="skill-description">Trouver des solutions par soi-même.</div>
+                    </div>
+                    <span id="debrouillardise-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="debrouillardise" min="0" max="10" value="5" data-category="action">
+            </div>
+            <div class="skill-item">
+                <label for="autonome" class="skill-label">
+                    <div>
+                        <span class="skill-name">Autonomie</span>
+                        <div class="skill-description">Travailler seul, sans qu'on soit toujours derrière toi.</div>
+                    </div>
+                    <span id="autonome-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="autonome" min="0" max="10" value="5" data-category="action">
+            </div>
+            <div class="skill-item">
+                <label for="efficacite" class="skill-label">
+                    <div>
+                        <span class="skill-name">Efficacité</span>
+                        <div class="skill-description">Aller droit au but pour bien faire son travail.</div>
+                    </div>
+                    <span id="efficacite-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="efficacite" min="0" max="10" value="5" data-category="action">
+            </div>
+            <div class="skill-item">
+                <label for="initiative" class="skill-label">
+                    <div>
+                        <span class="skill-name">Initiative</span>
+                        <div class="skill-description">Faire les choses sans attendre qu'on te le demande.</div>
+                    </div>
+                    <span id="initiative-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="initiative" min="0" max="10" value="5" data-category="action">
+            </div>
+             <div class="skill-item">
+                <label for="polyvalence" class="skill-label">
+                    <div>
+                        <span class="skill-name">Polyvalence</span>
+                        <div class="skill-description">Savoir faire plusieurs tâches différentes.</div>
+                    </div>
+                    <span id="polyvalence-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="polyvalence" min="0" max="10" value="5" data-category="action">
+            </div>
+        </div>
+
+        <div class="skill-group">
+            <h2>꼼 Rigueur & Organisation</h2>
+             <div class="skill-item">
+                <label for="organisation" class="skill-label">
+                    <div>
+                        <span class="skill-name">Organisation</span>
+                        <div class="skill-description">Savoir planifier et ranger son travail.</div>
+                    </div>
+                    <span id="organisation-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="organisation" min="0" max="10" value="5" data-category="rigueur">
+            </div>
+            <div class="skill-item">
+                <label for="maintien" class="skill-label">
+                    <div>
+                        <span class="skill-name">Maintien</span>
+                        <div class="skill-description">Avoir une posture et une tenue correctes.</div>
+                    </div>
+                    <span id="maintien-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="maintien" min="0" max="10" value="5" data-category="rigueur">
+            </div>
+            <div class="skill-item">
+                <label for="protection" class="skill-label">
+                    <div>
+                        <span class="skill-name">Protection</span>
+                        <div class="skill-description">Respecter les règles de sécurité pour soi et les autres.</div>
+                    </div>
+                    <span id="protection-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="protection" min="0" max="10" value="5" data-category="rigueur">
+            </div>
+            <div class="skill-item">
+                <label for="vigilance" class="skill-label">
+                    <div>
+                        <span class="skill-name">Vigilance</span>
+                        <div class="skill-description">Être attentif à ce qui se passe autour de soi.</div>
+                    </div>
+                    <span id="vigilance-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="vigilance" min="0" max="10" value="5" data-category="rigueur">
+            </div>
+            <div class="skill-item">
+                <label for="assiduite" class="skill-label">
+                    <div>
+                        <span class="skill-name">Assiduité</span>
+                        <div class="skill-description">Être présent et ponctuel tous les jours.</div>
+                    </div>
+                    <span id="assiduite-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="assiduite" min="0" max="10" value="5" data-category="rigueur">
+            </div>
+             <div class="skill-item">
+                <label for="integrite" class="skill-label">
+                    <div>
+                        <span class="skill-name">Intégrité</span>
+                        <div class="skill-description">Être honnête et droit dans son travail.</div>
+                    </div>
+                    <span id="integrite-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="integrite" min="0" max="10" value="5" data-category="rigueur">
+            </div>
+        </div>
+
+        <div class="skill-group">
+            <h2>🤝 Relationnel & Équipe</h2>
+            <div class="skill-item">
+                <label for="prevenance" class="skill-label">
+                    <div>
+                        <span class="skill-name">Prévenance</span>
+                        <div class="skill-description">Faire attention aux besoins des autres.</div>
+                    </div>
+                    <span id="prevenance-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="prevenance" min="0" max="10" value="5" data-category="relationnel">
+            </div>
+            <div class="skill-item">
+                <label for="equipe" class="skill-label">
+                    <div>
+                        <span class="skill-name">Esprit d'équipe</span>
+                        <div class="skill-description">Aimer travailler et aider ses collègues.</div>
+                    </div>
+                    <span id="equipe-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="equipe" min="0" max="10" value="5" data-category="relationnel">
+            </div>
+            <div class="skill-item">
+                <label for="asservite" class="skill-label">
+                    <div>
+                        <span class="skill-name">Assertivité</span>
+                        <div class="skill-description">Défendre ses idées calmement, sans gêner les autres.</div>
+                    </div>
+                    <span id="asservite-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="asservite" min="0" max="10" value="5" data-category="relationnel">
+            </div>
+            <div class="skill-item">
+                <label for="bienveillance" class="skill-label">
+                    <div>
+                        <span class="skill-name">Bienveillance</span>
+                        <div class="skill-description">Être gentil et compréhensif avec les autres.</div>
+                    </div>
+                    <span id="bienveillance-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="bienveillance" min="0" max="10" value="5" data-category="relationnel">
+            </div>
+            <div class="skill-item">
+                <label for="communication" class="skill-label">
+                    <div>
+                        <span class="skill-name">Communication</span>
+                        <div class="skill-description">Savoir bien écouter et s'exprimer clairement.</div>
+                    </div>
+                    <span id="communication-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="communication" min="0" max="10" value="5" data-category="relationnel">
+            </div>
+            <div class="skill-item">
+                <label for="respect" class="skill-label">
+                    <div>
+                        <span class="skill-name">Respect</span>
+                        <div class="skill-description">Être poli avec tout le monde et respecter le matériel.</div>
+                    </div>
+                    <span id="respect-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="respect" min="0" max="10" value="5" data-category="relationnel">
+            </div>
+        </div>
+        
+        <div class="skill-group">
+            <h2>🌱 Adaptation & Maturité</h2>
+            <div class="skill-item">
+                <label for="jugement" class="skill-label">
+                    <div>
+                        <span class="skill-name">Jugement</span>
+                        <div class="skill-description">Prendre de bonnes décisions, réfléchir avant d'agir.</div>
+                    </div>
+                    <span id="jugement-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="jugement" min="0" max="10" value="5" data-category="adaptation">
+            </div>
+            <div class="skill-item">
+                <label for="patience" class="skill-label">
+                    <div>
+                        <span class="skill-name">Patience</span>
+                        <div class="skill-description">Rester calme quand les choses sont longues ou difficiles.</div>
+                    </div>
+                    <span id="patience-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="patience" min="0" max="10" value="5" data-category="adaptation">
+            </div>
+            <div class="skill-item">
+                <label for="perseverance" class="skill-label">
+                    <div>
+                        <span class="skill-name">Persévérance</span>
+                        <div class="skill-description">Ne pas abandonner, même quand c'est compliqué.</div>
+                    </div>
+                    <span id="perseverance-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="perseverance" min="0" max="10" value="5" data-category="adaptation">
+            </div>
+            <div class="skill-item">
+                <label for="maturite" class="skill-label">
+                    <div>
+                        <span class="skill-name">Maturité</span>
+                        <div class="skill-description">Agir de manière responsable, comme un adulte.</div>
+                    </div>
+                    <span id="maturite-value" class="skill-value">5</span>
+                </label>
+                <input type="range" id="maturite" min="0" max="10" value="5" data-category="adaptation">
+            </div>
+        </div>
+
+        <button id="calculate-btn">Voir mes résultats</button>
+
+        <div id="results">
+            <h2>Tes Résultats</h2>
+            <div id="global-score">Ton score global est de : <span id="score-value"></span> / 10</div>
+            <div class="results-grid">
+                <div id="chart-container">
+                    <canvas id="profileChart"></canvas>
+                </div>
+                <div id="advice-container">
+                    <h3>Mes pistes de progression</h3>
+                    <p id="advice-text"></p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const sliders = document.querySelectorAll('input[type="range"]');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const resultsDiv = document.getElementById('results');
+        let profileChart = null;
+
+        // Met à jour la valeur affichée à côté du curseur
+        sliders.forEach(slider => {
+            const valueSpan = document.getElementById(`${slider.id}-value`);
+            slider.addEventListener('input', () => {
+                valueSpan.textContent = slider.value;
+            });
+        });
+
+        // Logique de calcul et d'affichage
+        calculateBtn.addEventListener('click', () => {
+            const scores = {
+                action: { total: 0, count: 0 },
+                rigueur: { total: 0, count: 0 },
+                relationnel: { total: 0, count: 0 },
+                adaptation: { total: 0, count: 0 }
+            };
+            let totalScore = 0;
+
+            sliders.forEach(slider => {
+                const value = parseInt(slider.value);
+                const category = slider.dataset.category;
+                scores[category].total += value;
+                scores[category].count++;
+                totalScore += value;
+            });
+
+            const averageScores = {
+                action: scores.action.total / scores.action.count,
+                rigueur: scores.rigueur.total / scores.rigueur.count,
+                relationnel: scores.relationnel.total / scores.relationnel.count,
+                adaptation: scores.adaptation.total / scores.adaptation.count
+            };
+            
+            const globalAverage = totalScore / sliders.length;
+            document.getElementById('score-value').textContent = globalAverage.toFixed(1);
+
+            displayChart(averageScores);
+            displayAdvice(averageScores);
+
+            resultsDiv.style.display = 'block';
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        });
+
+        function displayChart(scores) {
+            const ctx = document.getElementById('profileChart').getContext('2d');
+            const data = {
+                labels: ['🚀 Action & Initiative', '꼼 Rigueur & Organisation', '🤝 Relationnel & Équipe', '🌱 Adaptation & Maturité'],
+                datasets: [{
+                    label: 'Mes Talents',
+                    data: [scores.action, scores.rigueur, scores.relationnel, scores.adaptation],
+                    fill: true,
+                    backgroundColor: 'rgba(227, 6, 19, 0.2)',
+                    borderColor: 'rgb(227, 6, 19)',
+                    pointBackgroundColor: 'rgb(227, 6, 19)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(227, 6, 19)'
+                }]
+            };
+
+            if (profileChart) {
+                profileChart.destroy();
+            }
+
+            profileChart = new Chart(ctx, {
+                type: 'radar',
+                data: data,
+                options: {
+                    elements: {
+                        line: {
+                            borderWidth: 3
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: { display: false },
+                            suggestedMin: 0,
+                            suggestedMax: 10,
+                            pointLabels: {
+                                font: {
+                                    size: 13,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                           display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displayAdvice(scores) {
+            let lowestCat = '';
+            let lowestScore = 11;
+
+            for (const [cat, score] of Object.entries(scores)) {
+                if (score < lowestScore) {
+                    lowestScore = score;
+                    lowestCat = cat;
+                }
+            }
+            
+            let advice = '';
+            switch(lowestCat) {
+                case 'action':
+                    advice = "Pour progresser ici, essaie de proposer une idée, même petite, lors d'un prochain travail de groupe. Ou bien, commence une tâche par toi-même sans attendre qu'on te le dise. Chaque petite initiative compte !";
+                    break;
+                case 'rigueur':
+                    advice = "Tu peux t'améliorer en prenant 2 minutes avant de commencer un travail pour vérifier que tu as tout ce qu'il te faut. Pense aussi à bien ranger ton poste de travail à la fin. La rigueur, c'est comme un muscle, ça s'entraîne !";
+                    break;
+                case 'relationnel':
+                    advice = "Un bon point de départ est d'écouter attentivement tes camarades quand ils parlent, sans les couper. Tu peux aussi proposer ton aide à quelqu'un qui semble en difficulté. Un simple 'bonjour' ou 'merci' fait aussi une grande différence.";
+                    break;
+                case 'adaptation':
+                    advice = "Quand tu rencontres une difficulté, essaie de ne pas abandonner tout de suite. Prends une grande respiration et demande-toi : 'Quelle est la prochaine petite étape que je peux faire ?'. La persévérance, c'est avancer pas à pas.";
+                    break;
+            }
+            document.getElementById('advice-text').textContent = advice;
+        }
+
+    </script>
+
+</body>
+</html>
